@@ -5,7 +5,7 @@ editor: visual
 pdf-engine: lualatex
 ---
 
-## Quarto
+## IP CUP X-LINKED
 
 ```{r, pakker}
 #| echo: false
@@ -18,6 +18,7 @@ library(survival)
 
 ```{r, data}
 #| echo: false
+#| message: false
 hofte_analysefil <- read_sav("//ihelse.net/Kvalitetsregister/hbe/2011-06449/STATISTIKK/Hofte/2024/Hofte_2024.sav")
 
 
@@ -30,7 +31,7 @@ hofte_analysefil <- read_sav("//ihelse.net/Kvalitetsregister/hbe/2011-06449/STAT
 analysefil <- hofte_analysefil %>% 
   filter(P_ACET_PRODUKT == 55) %>% 
   mutate(kopptype = case_when(P_ACET_TYPE %in% c(69:98,100:105) ~ 1)) %>% 
-  filter(kopptype == 1)#%>% 
+  filter(kopptype == 1)%>% 
   mutate(INDIKATOR_2 = case_when(INDIKATOR ==  0 |
                                 R_FRAKTUR == 1 | #4 totalt i datasette
                                 R_GLUTEALSVIKT == 1 | #3 totalt i datasette
@@ -40,9 +41,91 @@ analysefil <- hofte_analysefil %>%
                                    is.na(R_FRAKTUR) &
                                    is.na(R_GLUTEALSVIKT) &
                                    is.na(R_GLUTEALSVIKT) &
-                                   is.na(R_LUKSASJON) ~ 1 ))
+                                   is.na(R_LUKSASJON) ~ 1 )) %>% 
+  mutate(INDIKATOR_KOPP = case_when(R_RE_TYPE_2 == 1 |
+                                      R_RE_TYPE_3 == 1 ~ 1,
+                                    TRUE ~ 0)) %>% 
+  mutate(INDIKATOR_STAMME = case_when(R_RE_TYPE_1 == 1 | 
+                                        R_RE_TYPE_3 == 1 ~ 1,
+                                      TRUE ~ 0))
 
 kopp1 <- analysefil %>% filter(kopptype == 1) #Highly crosslinked polyethylen
+
+
+```
+
+
+```{r}
+#| echo: false
+total <- NROW(analysefil)
+
+M_K <- analysefil %>% count(PAS_KJONN) %>% 
+  mutate(prop =scales::percent(prop.table(n),accuracy = 0.1))
+
+Mean_sd_age <- analysefil %>% summarise(mean_age = mean(ALDER), sd_age = sd(ALDER))
+
+OA <- analysefil %>% count(P_AKT_OP_1)
+
+RA <- analysefil %>% count(P_AKT_OP_2) #RA er Rheumatoid artritt ?
+
+#Hvordan teller jeg Other ?
+
+antall_døde <- analysefil %>% 
+  count(FREG_STATUS_FLAG) %>% 
+  mutate(prop =scales::percent(prop.table(n),accuracy = 0.1))
+
+#Number of implants lost to follow-up?
+
+total_reop <- analysefil %>% count(INDIKATOR) %>% 
+  mutate(prop =scales::percent(prop.table(n),accuracy = 0.1))
+
+ant_total_reop <- total_reop %>% 
+  filter(INDIKATOR == 1) %>% 
+  select(n) %>% as.numeric()
+
+#Number of patients examined in person?
+
+#Number of patients examined by questionnaire/telephone review?
+
+#Mean follow-up and range (years) of implants in full cohort? er det tid fra primæroperasjon til revisjon?
+
+ant_infeksjon <- analysefil %>% count(R_AKT_OP_4) %>% 
+  filter(R_AKT_OP_4 == 1) %>% 
+  select(n) %>% as.numeric()
+pro_infeksjon <- percent(ant_infeksjon/ant_total_reop,accuracy = 0.1) 
+
+ant_smerte <- analysefil %>% count(R_AKT_OP_7) %>% 
+  filter(R_AKT_OP_7 == 1) %>% 
+  select(n) %>% as.numeric()
+
+pro_smerte <- percent(ant_smerte/ant_total_reop,accuracy = 0.1) 
+
+
+ant_smerte <- analysefil %>% count(R_AKT_OP_7) %>% 
+  filter(R_AKT_OP_7 == 1) %>% 
+  select(n) %>% as.numeric()
+
+pro_smerte <- percent(ant_smerte/ant_total_reop,accuracy = 0.1) 
+
+ant_løsning <- analysefil %>% count(R_AKT_OP_1,R_AKT_OP_2) %>% 
+  filter(R_AKT_OP_1 == 1 | R_AKT_OP_2 == 1) %>% 
+  summarise(sum = sum(n)) %>% as.numeric()
+
+pro_løsning <- percent(ant_løsning/ant_total_reop,accuracy = 0.1) 
+
+ant_fraktur <-  analysefil %>% count(R_AKT_OP_5,R_AKT_OP_6) %>% 
+  filter(R_AKT_OP_5 == 1 | R_AKT_OP_6 == 1) %>% 
+  summarise(sum = sum(n)) %>% as.numeric()
+
+pro_fraktur <- percent(ant_fraktur/ant_total_reop,accuracy = 0.1) 
+
+# Malpositio/malalignment?
+
+#Aseptic loosening?
+
+#Wear?
+
+#Other ?
 
 
 ```
@@ -50,9 +133,26 @@ kopp1 <- analysefil %>% filter(kopptype == 1) #Highly crosslinked polyethylen
 ```{r, overlevelse}
 #| echo: false
 
+#Kaplan Meier survival time in years, 10 år ?
+
 KM <- summary(survfit(Surv(SURVYRS, INDIKATOR_2)~1, data=kopp1))
 #83 er 8.83 84 er 10.12
 
-ti_års_overlevelse_kopp <- KM$surv[83] 
 ti_års_nrisk_kopp <- KM$n.risk[83]
+
+ti_års_overlevelse <- percent(1-KM$surv[83],accuracy = 0.1,decimal.mark = ",")
+ti_års_overlevelse_low <- percent(1-KM$lower[83],accuracy = 0.1,decimal.mark = ",")
+ti_års_overlevelse_up <- percent(1-KM$upper[83],accuracy = 0.1,decimal.mark = ",")
+
+KM_K <- summary(survfit(Surv(SURVYRS, INDIKATOR_KOPP)~1, data=kopp1))
+
+ti_års_overlevelse_kopp <- percent(1-KM$surv[83],accuracy = 0.1,decimal.mark = ",")
+ti_års_overlevelse_low <- percent(1-KM$lower[83],accuracy = 0.1,decimal.mark = ",")
+ti_års_overlevelse_up <- percent(1-KM$upper[83],accuracy = 0.1,decimal.mark = ",")
+
+
 ```
+
+
+
+Totalt antall pasienter i analysefilen for koppen er `{r} total`. Antall menn er `{r} M_K$n[1]` 
