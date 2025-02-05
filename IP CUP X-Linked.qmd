@@ -47,28 +47,60 @@ analysefil <- hofte_analysefil %>%
                                     TRUE ~ 0)) %>% 
   mutate(INDIKATOR_STAMME = case_when(R_RE_TYPE_1 == 1 | 
                                         R_RE_TYPE_3 == 1 ~ 1,
-                                      TRUE ~ 0))
+                                      TRUE ~ 0)) %>% 
+  mutate(diagnose = case_when(P_AKT_OP_2 == 1 ~ 1,
+                              P_AKT_OP_1 == 1 &
+                              (P_AKT_OP_2 == 0 | 
+                                is.na(P_AKT_OP_2)) ~ 2,
+                              TRUE ~ 3))
 
-kopp1 <- analysefil %>% filter(kopptype == 1) #Highly crosslinked polyethylen
+
+
+```
+
+```{r}
+#| echo: false
+
+ant_sykehus <- analysefil %>% count(P_SYKEHUS) %>% NROW(.) %>% print()
+
+#Number of surgeons implanting, hvordan finner jeg ut det?
+
 
 
 ```
 
 
+
+
 ```{r}
 #| echo: false
-total <- NROW(analysefil)
+unike_pasienter <- analysefil %>% 
+  distinct(ID_NR,.keep_all = T)  
+
+total_pasienter <- unike_pasienter %>% NROW(.)
+
+menn_pasienter <- unike_pasienter %>% 
+  filter(PAS_KJONN == 1) %>% NROW(.)
+
+kvinner_pasienter <- unike_pasienter %>% 
+  filter(PAS_KJONN == 2) %>% NROW(.)
+
+mean_age <- unike_pasienter %>% 
+  summarise(mean_age = mean(ALDER), max_age = max(ALDER), min_age = min(ALDER))
+
 
 M_K <- analysefil %>% count(PAS_KJONN) %>% 
   mutate(prop =scales::percent(prop.table(n),accuracy = 0.1))
 
-Mean_sd_age <- analysefil %>% summarise(mean_age = mean(ALDER), sd_age = sd(ALDER))
+Mean_sd_age <- analysefil %>% summarise(mean_age = mean(ALDER), sd_age = sd(ALDER)) #min max
 
 OA <- analysefil %>% count(P_AKT_OP_1)
 
 RA <- analysefil %>% count(P_AKT_OP_2) #RA er Rheumatoid artritt ?
 
 #Hvordan teller jeg Other ?
+
+døde <- analysefil %>% filter(FREG_STATUS_FLAG==5) %>% count(INDIKATOR)
 
 antall_døde <- analysefil %>% 
   count(FREG_STATUS_FLAG) %>% 
@@ -83,11 +115,17 @@ ant_total_reop <- total_reop %>%
   filter(INDIKATOR == 1) %>% 
   select(n) %>% as.numeric()
 
+implants <- analysefil %>% count(INDIKATOR_2,FREG_STATUS_FLAG)
+
 #Number of patients examined in person?
 
 #Number of patients examined by questionnaire/telephone review?
 
 #Mean follow-up and range (years) of implants in full cohort? er det tid fra primæroperasjon til revisjon?
+
+mean_follow_up <- analysefil %>% 
+  #filter(INDIKATOR_2 == 1) %>% 
+  summarise(mean = mean(SURVYRS), min = min(SURVYRS) ,max =   max(SURVYRS))
 
 ant_infeksjon <- analysefil %>% count(R_AKT_OP_4) %>% 
   filter(R_AKT_OP_4 == 1) %>% 
@@ -135,21 +173,39 @@ pro_fraktur <- percent(ant_fraktur/ant_total_reop,accuracy = 0.1)
 
 #Kaplan Meier survival time in years, 10 år ?
 
-KM <- summary(survfit(Surv(SURVYRS, INDIKATOR_2)~1, data=kopp1))
+ant_at_risk_10 <- analysefil %>% 
+  count(SURVYRS > 10)
+
+KM <- summary(survfit(Surv(SURVYRS, INDIKATOR_2)~1, data=analysefil))
 #83 er 8.83 84 er 10.12
 
 ti_års_nrisk_kopp <- KM$n.risk[83]
 
 ti_års_overlevelse <- percent(1-KM$surv[83],accuracy = 0.1,decimal.mark = ",")
-ti_års_overlevelse_low <- percent(1-KM$lower[83],accuracy = 0.1,decimal.mark = ",")
-ti_års_overlevelse_up <- percent(1-KM$upper[83],accuracy = 0.1,decimal.mark = ",")
+ti_års_overlevelse_low <- percent(1-KM$lower[83],accuracy = 0.1,decimal.mark = ",") %>% 
+  print()
+ti_års_overlevelse_up <- percent(1-KM$upper[83],accuracy = 0.1,decimal.mark = ",") %>% 
+  print()
 
-KM_K <- summary(survfit(Surv(SURVYRS, INDIKATOR_KOPP)~1, data=kopp1))
+KM_K <- summary(survfit(Surv(SURVYRS, INDIKATOR_KOPP)~1, data=analysefil))
+#25 er 8.3 #26 er 10.12 på tid
 
-ti_års_overlevelse_kopp <- percent(1-KM$surv[83],accuracy = 0.1,decimal.mark = ",")
-ti_års_overlevelse_low <- percent(1-KM$lower[83],accuracy = 0.1,decimal.mark = ",")
-ti_års_overlevelse_up <- percent(1-KM$upper[83],accuracy = 0.1,decimal.mark = ",")
+ti_års_overlevelse_kopp <- percent(1-KM_K$surv[25],accuracy = 0.1,decimal.mark = ",") %>% 
+  print()
+ti_års_overlevelse_kopp_low <- percent(1-KM_K$lower[25],accuracy = 0.1,decimal.mark = ",") %>% 
+  print()
+ti_års_overlevelse_kopp_up <- percent(1-KM_K$upper[25],accuracy = 0.1,decimal.mark = ",") %>% 
+  print()
 
+KM_S <- summary(survfit(Surv(SURVYRS, INDIKATOR_STAMME)~1, data=analysefil))
+#last event er 6 på 4.01
+
+ti_års_overlevelse_stamme <- percent(1-KM_S$surv[6],accuracy = 0.1,decimal.mark = ",") %>% 
+  print()
+ti_års_overlevelse_stamme_low <- percent(1-KM_S$lower[6],accuracy = 0.1,decimal.mark = ",") %>%
+  print()
+ti_års_overlevelse_stamme_up <- percent(1-KM_S$upper[6],accuracy = 0.1,decimal.mark = ",") %>% 
+  print()
 
 ```
 
