@@ -12,6 +12,7 @@ pdf-engine: lualatex
 library(tidyverse)
 library(haven)
 library(survival)
+library(scales)
 
 
 ```
@@ -53,7 +54,12 @@ analysefil <- hofte_analysefil %>%
                               (P_AKT_OP_2 == 0 | 
                                 is.na(P_AKT_OP_2)) ~ 2,
                               TRUE ~ 3))
+#Hva er forskjellen på Recurrent dislocation og Aseptic loosening
 
+
+
+#hiraki modell revision 
+#Malposition/malalignment > fraktur > løsning > 
 
 
 ```
@@ -86,7 +92,7 @@ kvinner_pasienter <- unike_pasienter %>%
   filter(PAS_KJONN == 2) %>% NROW(.)
 
 mean_age <- unike_pasienter %>% 
-  summarise(mean_age = mean(ALDER), max_age = max(ALDER), min_age = min(ALDER))
+  summarise(mean_age = mean(ALDER), max_age = max(ALDER), min_age = min(ALDER),median(ALDER))
 
 
 M_K <- analysefil %>% count(PAS_KJONN) %>% 
@@ -167,6 +173,13 @@ pro_fraktur <- percent(ant_fraktur/ant_total_reop,accuracy = 0.1)
 
 
 ```
+
+```{r}
+#| echo: false
+
+
+```
+
 
 ```{r, overlevelse}
 #| echo: false
